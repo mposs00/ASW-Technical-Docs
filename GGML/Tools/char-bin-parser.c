@@ -31,33 +31,131 @@ static bool inline get_bit(uint32_t *bit_counter, uint32_t *cur_word,
 //
 // Here be Dragons
 void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
-  uint32_t a1 = 0;
+  
   uint32_t a2 = 0;
   uint32_t a6 = 0;
   uint32_t a7 = 0;
   uint32_t cur_word = 0;
   uint32_t bit_counter = 0;
+  uint8_t *cur_ptr = encoded_sprite + 8;
   uint32_t t4 = 0;
   uint32_t t5 = 0;
   uint32_t t9 = 0;
   uint32_t t6;
-  uint32_t t8 = 0;
   uint32_t v0 = 0;
   uint32_t v1 = 0;
   uint32_t s1 = 0;
   uint32_t s2 = 0;
   uint32_t a0 = 0;
+  uint32_t s5 = 0;
+  uint32_t s6 = 0;
+  uint32_t s4 = 0;
+  uint32_t s0 = 0;
 
   if (*(uint8_t *)encoded_sprite) {
+    uint32_t s3 = *(uint8_t*)(encoded_sprite + 3);
+    uint32_t s5 = *(uint8_t*)(encoded_sprite + 2) >> 2;
+    uint8_t *a0 = *(uint16_t*)(encoded_sprite + 6) + encoded_sprite;
+    uint8_t *t8 = *(uint16_t*)(encoded_sprite + 4) + encoded_sprite;
+    uint32_t a3 = 0;
+    uint32_t a5 = 0;
+    uint32_t a4 = 0;
+    uint32_t t7 = 0;
+    s4 = s5 << 2;
+    while (s3 != 0) {
+      t9 = s5 << 2;
 
+      while (t9 != 0) {
+        if (s1 == 0) {
+          if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
+            if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
+              if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
+                a3 |= t4;
+                a5 |= a4;
+              }
+              else {
+                if (t5 == 0) {
+                  t6 = *(uint32_t*)t8;
+                  t8 += sizeof(uint32_t);
+                  t5 = 8;
+                }
+                a3 |= t4;
+                a5 |= a4;
+                s1 += ((t6 & 0xF) + 2);
+                t6 = t6 >> 4;
+                t5--;
+              }
+            }
+            else {
+              if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
+                a4 = (t7 << 24) | (t7 << 28);
+                t4 = a4;
+                a3 |= a4;
+                a5 |= a4;
+              }
+              else {
+                t7 = t6 & 0xF;
+                if (t5 == 0) {
+                  t6 = *(uint32_t*)t8;
+                  t8 += sizeof(uint32_t);
+                  t5 = 8;
+                  t7 = t6 & 0xF;
+                }
+                t6 = t6 >> 4;
+                t5--;
+                a4 = (t7 << 24) | (t7 << 28);
+                t4 = a4;
+                a3 |= a4;
+                a5 |= a4;
+              }
+            }
+          }
+          else {
+            t4 = s0 << 24;
+            if (s2 == 0) {
+              s0 = *(uint32_t*)a0;
+              a0 += sizeof(uint32_t);
+              t4 = s0 << 24;
+            }
+            a4 = (s0 & 0xFF00) << 16;
+            s0 = s0 >> 16;
+            s2 = s2 ^ 0x01;
+            a3 |= t4;
+            a5 |= a4;
+            t7 = t4 >> 28;
+          }
+        }
+        else {
+          a3 |= t4;
+          a5 |= a4;
+          s1--;
+        }
+        
+        if((t9 & 3) != 1) {
+          a3 = a3 >> 8;
+          a5 = a5 >> 8;
+        }
+        else {
+          *(uint32_t*)(dest) = a3;
+          *(uint32_t*)(dest + s4) = a5;
+          a3 = 0;
+          a5 = 0;
+          dest += sizeof(uint32_t);
+        }
+        t9--;
+      }
+
+      s3--;
+      dest += s4;
+    }
   } else {
-    uint8_t *cur_ptr = encoded_sprite + 8;
-
-    uint8_t s6 = *(uint8_t *)(encoded_sprite + 2) >> 2;
-    uint8_t s4 = *(uint8_t *)(encoded_sprite + 3);
+    uint32_t a1 = 0;
+    uint32_t t8 = 0;
+    s6 = *(uint8_t *)(encoded_sprite + 2) >> 2;
+    s4 = *(uint8_t *)(encoded_sprite + 3);
     uint8_t *t7 = encoded_sprite + *(uint16_t *)(encoded_sprite + 4);
     uint8_t *s3 = encoded_sprite + *(uint16_t *)(encoded_sprite + 6);
-    uint8_t s5 = s6 << 2;
+    s5 = s6 << 2;
 
     while (s4 != 0) {
       a0 = s6 << 2;
