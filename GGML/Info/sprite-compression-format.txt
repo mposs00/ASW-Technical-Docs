@@ -1,0 +1,96 @@
+The following are unstructured notes posted into a Discord channel over an hour of investigation. Images are missing, but the main conclusion is at the bottom. Comments have also been added to the C tool.
+
+[4:22 AM]scatterflower: I've started to reverse engineer the compression algorithm
+[4:22 AM]scatterflower: the two "loop control" bytes are actually equal to the 4bpp width of the image, and the height of the image divided by two
+[4:23 AM]scatterflower: the outer loop iterates every two lines, and the inner loop iterates every two pixels (one byte)
+[4:23 AM]scatterflower: two lines are decoded simultaneously
+[4:24 AM]scatterflower: two pixels at a time, on a pair of even and odd lines in the image
+[4:25 AM]scatterflower: two variable length codes do a form of RLE
+[4:27 AM]scatterflower: 0b100 - The next bytes in each line are the same as the previous bytes in each line
+0b101 - A form of RLE. The next 3-17 bytes in each line are the same as the previous bytes in each line. The length of the run is encoded in the "t7" region of the compressed data (the offset is the first ushort following the width/height bytes)
+[4:28 AM]scatterflower: 1 byte run - not a real run, no RLE
+2 byte run - use 0b100
+3+ byte run - use 0b101 and data at t7 to encode the length of the run
+[4:33 AM]scatterflower: 0b0100, 0b0101, and 0b011 all encode "squares" of pixels, where the two pixels on the odd line are the same as the two pixels on the even line
+[4:34 AM]scatterflower: 0b0100 - both come from the current value of t8
+0b0101 - both come from the current value of a1
+0b011 - both come from the next nibble at the t7 pointer
+[4:37 AM]scatterflower: 0b11 is the odd one out. this is where the s3 pointer (offset from second ushort following width/height bytes) comes in
+[4:50 AM]scatterflower:
+Image
+[4:50 AM]scatterflower: Interesting: the histogram of codes doesn't neatly correspond to their length
+[4:51 AM]scatterflower: this is an inefficiency, but is inevitable from a fixed-tree setup
+[4:51 AM]scatterflower: It's notable how common this one is. This is probably used for sections without much exploitable redundancy, directly encoding the bytes somehow (which corresponds with the low entropy of this section in the file)
+[4:53 AM]scatterflower: 0b101 is definitely saving the most space; most of the image is, in fact, 0x00 repeating
+[4:54 AM]scatterflower:
+Image
+[4:54 AM]scatterflower: these codes aren't broken out into the total
+[4:55 AM]scatterflower: these two if statements actually correspond to four codes, because of how they are sequential like this
+[4:56 AM]scatterflower: 0b0011 - load nibbles at t7 into t8 and then a1
+0b0010 - load nibble at t7 into t8
+0b0001 - load nibble at t7 into a1
+0b0000 - don't update t8 or a1
+
+all of these are followed by the same behavior with this conditional: 
+[4:57 AM]scatterflower:
+Image
+[4:59 AM]scatterflower: another nibble is loaded from t7, and its value can lead to a few different outcomes:
+[5:08 AM]scatterflower: Assuming LSB is bit 0:
+
+nibble bit 0 clear: former pixel in odd line comes from t8
+nibble bit 0 set: former pixel in odd line comes from a1
+
+nibble bit 1 clear: latter pixel in odd line comes from t8
+nibble bit 1 set: latter pixel in odd line comes from a1
+
+nibble bit 2 clear: former pixel in even line comes from t8
+nibble bit 2 set: former pixel in even line comes from a1
+
+nibble bit 3 clear: latter pixel in even line comes from t8
+nibble bit 3 set: latter pixel in even line comes from a1
+[5:09 AM]scatterflower: so, 16 possible combinations in total
+[5:10 AM]scatterflower: more complexity is introduced in the cases where new values are not loaded into both t8 and a1, because these can be set by prior iterations of the loop
+[5:10 AM]scatterflower: t8 and a1 are both set here when decoding opcode 0b11
+Image
+[5:11 AM]scatterflower: so, if we assume 0b11 is our "no pattern, just literal load the color from another part"
+[5:11 AM]scatterflower: the 0b00xx codes allow different patterns to be made with those two colors
+[5:12 AM]scatterflower: or, if we loaded those colors with 0b0011 (or one of the variants)
+[5:12 AM]scatterflower: they can be reused in later iterations
+[5:12 AM]scatterflower: this gives more efficient coding in regions where the same two colors are used
+[5:13 AM]scatterflower: a two-color checkerboard pattern would be encoded very efficiently by this
+[5:13 AM]scatterflower: 0b11 still confounds me though, because it is loading 16 bits at a time basically, and it seems like a good deal of it gets discarded?
+[5:13 AM]scatterflower: certainly warrants further investigation
+[5:15 AM]scatterflower:
+Image
+[5:16 AM]scatterflower: we can see now that b00xx codes are actually responsible for the majority of the encoded data
+[5:17 AM]scatterflower: it might make the most sense to think of b00xx as just b00, with an additional half-nibble codeword that always follows it in the bitstream
+[5:18 AM]scatterflower: This means that this encoding is not a prefix code
+[5:19 AM]scatterflower: which, by extension, means that this is certainly and definitely not a huffman code (but this was already known)
+[5:24 AM]scatterflower: Another interesting thing if we consider b00 to be a codeword: the histogram actually does line up with the codeword length pretty nicely
+[5:24 AM]scatterflower: well, despite the overrepresentation of b0100
+[5:24 AM]scatterflower: BUT
+[5:25 AM]scatterflower: we could also consider 0b01 to be the prefix
+[5:25 AM]scatterflower: in which case we do get a nice distribution
+[5:25 AM]scatterflower: but that is kind of cheating
+[5:26 AM]scatterflower: but it does help to write out a spec!!
+[5:26 AM]scatterflower: we can think of it as containing 4 opcodes
+[5:29 AM]scatterflower: 0b00 - pixel data stored at *t7, and placed in even/odd lines at left/right pixels in a 2x2 square depending on the following 2-bit opcode
+Following code:
+0b00 - Use data already in t8/a1
+0b01 - Get new data for a1 from *t7
+0b10 - Get new data for t8 from *t7
+0b11 - Get new data for t8 from *t7, then get new data for t1 from *t7
+0b01 - even and odd lines contain the same pixels
+Following code:
+0b0 - Use the data already loaded from *t7 to determine the color
+Another code follows this
+0b0 - Use the data in t8
+0b1 - Use the data in a1
+0b1 - Fetch a new nibble from *t7 to determine the color
+0b10 - Run length encoding of previous pixels
+Following code:
+0b0 - Repeat last group of 4 pixels
+0b1 - Read a nibble from *t7 to determine how many times to repeat last group of 4 pixels (3 - 35 times)
+0b11 - All 4 pixels literally stored at location in *s3 
+[5:36 AM]scatterflower: That's it
+[5:36 AM]scatterflower: that is the entire decompression algorithm
