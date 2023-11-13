@@ -347,11 +347,16 @@ void write_tim(char *filename, uint8_t *img, size_t img_len, uint8_t *clut,
   free(tim_buf);
 }
 
-int main() {
+int main(int argc, char** argv) {
   int fd;
   struct stat sb;
 
-  fd = open("./SL.BIN", O_RDONLY);
+  if (argc < 3) {
+    printf("Usage: ./rip [filename] [output dir]\n");
+    exit(1);
+  }
+
+  fd = open(argv[1], O_RDONLY);
   fstat(fd, &sb);
 
   uint8_t *filebuf = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -448,7 +453,7 @@ int main() {
       decode_sprite((uint8_t *)(filebuf + cur_file_offset + sprite_offset),
                     dest);
       printf("Decoded sprite (%04X bytes)\n", img_size);
-      snprintf(filename, 0x40, "./output/%08X.TIM", cur_file_offset);
+      snprintf(filename, 0x40, "%s/%08X.TIM", argv[2], cur_file_offset);
       write_tim(filename, dest, img_size, clut, 0x2C, w, h, x, y);
       free(dest);
     }
