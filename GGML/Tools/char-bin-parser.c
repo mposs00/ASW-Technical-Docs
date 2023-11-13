@@ -32,6 +32,7 @@ static bool inline get_bit(uint32_t *bit_counter, uint32_t *cur_word,
 // Here be Dragons
 void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
   // Debug counters used for stats
+  /*
   int total_codes = 0;
   int b11 = 0;
   int b011 = 0;
@@ -40,6 +41,7 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
   int b101 = 0;
   int b100 = 0;
   int b00xx = 0;
+  */
   
 
   uint8_t *orig_dest = dest;
@@ -249,20 +251,20 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
               // skipping of decoding here.
               t9 = 0;
 
-              b00xx++;
-              total_codes++;
+              //b00xx++;
+              //total_codes++;
             } else {
               if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
                 if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
                   v1 = t8 << 24;
                   v0 = t8 << 28;
 
-                  b0100++;
+                  //b0100++;
                 } else {
                   v1 = a1 << 24;
                   v0 = a1 << 28;
 
-                  b0101++;
+                  //b0101++;
                 }
 
               } else {
@@ -278,7 +280,7 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
                 v1 = t8 << 24;
                 v0 = t8 << 28;
 
-                b011++;
+                //b011++;
               }
               a2 = v1 | v0;
               a6 = a2;
@@ -297,7 +299,7 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
               even_line |= a2;
               odd_line |= a2;
 
-              total_codes++;
+              //total_codes++;
             }
           } else {
             if (get_bit(&bit_counter, &cur_word, &cur_ptr) == 0) {
@@ -306,8 +308,8 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
                 even_line |= a6;
                 odd_line |= a2;
 
-                b100++;
-                total_codes++;
+                //b100++;
+                //total_codes++;
               } else {
                 // The familiar idiom occurs here, and the result is used to
                 // update t9. t9 is used as a conditional at the start of the
@@ -339,8 +341,8 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
                 t6 = t6 >> 4;
                 a7--;
 
-                b101++;
-                total_codes++;
+                //b101++;
+                //total_codes++;
               }
             } else {
               // This entire section needs more analysis. It breaks a lot of
@@ -379,12 +381,12 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
               // there.
               a1 = a2 >> 28;
 
-              b11++;
-              total_codes++;
+              //b11++;
+              //total_codes++;
             }
           }
         } else {
-          printf("cur_pxl = %08X t9 = %08X\n", cur_pxl, t9);
+          //printf("cur_pxl = %08X t9 = %08X\n", cur_pxl, t9);
           // We have encoded a run, so just continue to OR in the last decoded
           // values (usually, but not always 0x00)
           even_line |= a6;
@@ -411,9 +413,9 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
         } else {
           *(uint32_t *)(dest) = even_line;         // Even line
           *(uint32_t *)(dest + stride) = odd_line; // Odd line
-          printf(
-              "Writes at dest + %08lX (%08X) and dest + %08lX + %08X (%08X)\n",
-              dest - orig_dest, even_line, dest - orig_dest, stride, odd_line);
+          //printf(
+          //    "Writes at dest + %08lX (%08X) and dest + %08lX + %08X (%08X)\n",
+          //    dest - orig_dest, even_line, dest - orig_dest, stride, odd_line);
           even_line = 0;
           odd_line = 0;
           dest += 4;
@@ -425,8 +427,8 @@ void decode_sprite(uint8_t *encoded_sprite, uint8_t *dest) {
     }
   }
 
-  printf("Image contained a total of %d variable-length codes\n", total_codes);
-  printf("b11: %d\nb011: %d\nb0101: %d\nb0100: %d\nb101: %d\nb100: %d\nb00xx: %d\n", b11, b011, b0101, b0100, b101, b100, b00xx);
+  //printf("Image contained a total of %d variable-length codes\n", total_codes);
+  //printf("b11: %d\nb011: %d\nb0101: %d\nb0100: %d\nb101: %d\nb100: %d\nb00xx: %d\n", b11, b011, b0101, b0100, b101, b100, b00xx);
 }
 
 void write_tim(char *filename, uint8_t *img, size_t img_len, uint8_t *clut,
